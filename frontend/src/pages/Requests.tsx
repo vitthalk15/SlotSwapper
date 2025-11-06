@@ -38,6 +38,18 @@ interface SwapRequest {
   };
 }
 
+// Safe date formatter to avoid "Invalid time value" errors
+const safeFormat = (value?: string, fmt: string = 'PPP p') => {
+  try {
+    if (!value) return '—';
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return '—';
+    return format(d, fmt);
+  } catch {
+    return '—';
+  }
+};
+
 const Requests = () => {
   const { user } = useAuth();
   const [incomingRequests, setIncomingRequests] = useState<SwapRequest[]>([]);
@@ -153,7 +165,7 @@ const Requests = () => {
                             Swap Request from {request.requester_id?.name || 'Unknown User'}
                           </CardTitle>
                           <CardDescription>
-                            {format(new Date(request.created_at), 'PPP')}
+                            {safeFormat(request.created_at, 'PPP')}
                           </CardDescription>
                         </div>
                         {getStatusBadge(request.status)}
@@ -164,20 +176,20 @@ const Requests = () => {
                         <div className="space-y-2">
                           <h4 className="font-semibold text-sm">They offer:</h4>
                           <div className="p-3 bg-muted/50 rounded-lg">
-                            <p className="font-medium">{request.requester_event_id.title}</p>
+                            <p className="font-medium">{request.requester_event_id?.title || '—'}</p>
                             <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                               <Clock className="w-3 h-3" />
-                              {format(new Date(request.requester_event_id.start_time), 'PPP p')}
+                              {safeFormat(request.requester_event_id?.start_time)}
                             </div>
                           </div>
                         </div>
                         <div className="space-y-2">
                           <h4 className="font-semibold text-sm">For your:</h4>
                           <div className="p-3 bg-muted/50 rounded-lg">
-                            <p className="font-medium">{request.recipient_event_id.title}</p>
+                            <p className="font-medium">{request.recipient_event_id?.title || '—'}</p>
                             <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                               <Clock className="w-3 h-3" />
-                              {format(new Date(request.recipient_event_id.start_time), 'PPP p')}
+                              {safeFormat(request.recipient_event_id?.start_time)}
                             </div>
                           </div>
                         </div>
@@ -232,7 +244,7 @@ const Requests = () => {
                             Swap Request to {request.recipient_id?.name || 'Unknown User'}
                           </CardTitle>
                           <CardDescription>
-                            {format(new Date(request.created_at), 'PPP')}
+                            {safeFormat(request.created_at, 'PPP')}
                           </CardDescription>
                         </div>
                         {getStatusBadge(request.status)}
@@ -243,20 +255,20 @@ const Requests = () => {
                         <div className="space-y-2">
                           <h4 className="font-semibold text-sm">You offered:</h4>
                           <div className="p-3 bg-muted/50 rounded-lg">
-                            <p className="font-medium">{request.requester_event_id.title}</p>
+                            <p className="font-medium">{request.requester_event_id?.title || '—'}</p>
                             <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                               <Clock className="w-3 h-3" />
-                              {format(new Date(request.requester_event_id.start_time), 'PPP p')}
+                              {safeFormat(request.requester_event_id?.start_time)}
                             </div>
                           </div>
                         </div>
                         <div className="space-y-2">
                           <h4 className="font-semibold text-sm">For their:</h4>
                           <div className="p-3 bg-muted/50 rounded-lg">
-                            <p className="font-medium">{request.recipient_event_id.title}</p>
+                            <p className="font-medium">{request.recipient_event_id?.title || '—'}</p>
                             <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                               <Clock className="w-3 h-3" />
-                              {format(new Date(request.recipient_event_id.start_time), 'PPP p')}
+                              {safeFormat(request.recipient_event_id?.start_time)}
                             </div>
                           </div>
                         </div>
