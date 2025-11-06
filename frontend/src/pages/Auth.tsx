@@ -165,7 +165,7 @@ const Auth = () => {
                     <Input
                       id="signup-name"
                       type="text"
-                      placeholder="John Doe"
+                      placeholder="Your Name"
                       value={signUpName}
                       onChange={(e) => setSignUpName(e.target.value)}
                       required
@@ -176,7 +176,7 @@ const Auth = () => {
                     <Input
                       id="signup-email"
                       type="email"
-                      placeholder="you@example.com"
+                      placeholder="abc@example.com"
                       value={signUpEmail}
                       onChange={(e) => setSignUpEmail(e.target.value)}
                       required
