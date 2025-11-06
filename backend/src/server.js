@@ -14,8 +14,31 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Middleware
-app.use(cors());
+// CORS configuration
+const allowedOrigins = [
+  process.env.CORS_ORIGIN,
+  'http://localhost:8080',
+  'http://127.0.0.1:8080',
+  'https://slot-swapper-xi.vercel.app',
+].filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true); // allow server-to-server / curl
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error('Not allowed by CORS'));
+    },
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+    maxAge: 86400,
+  })
+);
+
+// Explicitly handle preflight
+app.options('*', cors());
+
 app.use(express.json());
 
 // Connect to MongoDB
@@ -62,15 +85,12 @@ app.get('/api/swappable-slots', authenticateToken, async (req, res) => {
 app.post('/api/swap-request', authenticateToken, async (req, res) => {
   try {
     const SwapRequest = (await import('./models/SwapRequest.js')).default;
-    const Event = (await import('./models/Event.js')).default;
-    
     const { mySlotId, theirSlotId } = req.body;
 
     if (!mySlotId || !theirSlotId) {
       return res.status(400).json({ error: 'Both event IDs are required (mySlotId and theirSlotId)' });
     }
 
-    // Verify both events exist and are swappable
     const [requesterEvent, recipientEvent] = await Promise.all([
       Event.findById(mySlotId),
       Event.findById(theirSlotId),
@@ -80,18 +100,15 @@ app.post('/api/swap-request', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'One or both events not found' });
     }
 
-    // Verify requester owns the requester event
     if (requesterEvent.user_id.toString() !== req.user._id.toString()) {
       return res.status(403).json({ error: 'You do not own the requester event' });
     }
 
-    // Verify both events are swappable
     if (requesterEvent.status !== 'SWAPPABLE' || recipientEvent.status !== 'SWAPPABLE') {
       return res.status(400).json({ error: 'One or both events are no longer swappable' });
     }
 
-    // Create swap request
-    const swapRequest = new SwapRequest({
+    const SwapReq = new SwapRequest({
       requester_id: req.user._id,
       requester_event_id: mySlotId,
       recipient_id: recipientEvent.user_id,
@@ -99,15 +116,15 @@ app.post('/api/swap-request', authenticateToken, async (req, res) => {
       status: 'PENDING',
     });
 
-    await swapRequest.save();
+    await SwapReq.save();
 
-    // Update both events to SWAP_PENDING
     await Promise.all([
       Event.findByIdAndUpdate(mySlotId, { status: 'SWAP_PENDING' }),
       Event.findByIdAndUpdate(theirSlotId, { status: 'SWAP_PENDING' }),
     ]);
 
-    const populatedRequest = await SwapRequest.findById(swapRequest._id)
+    const populatedRequest = await (await import('./models/SwapRequest.js')).default
+      .findById(SwapReq._id)
       .populate('requester_id', 'name email')
       .populate('recipient_id', 'name email')
       .populate('requester_event_id')
@@ -130,6 +147,9 @@ app.get('/api/health', (req, res) => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
+  if (err && err.message === 'Not allowed by CORS') {
+    return res.status(403).json({ error: 'CORS blocked', originTried: req.headers.origin });
+  }
   console.error(err.stack);
   res.status(500).json({ error: 'Something went wrong!', message: err.message });
 });
