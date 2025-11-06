@@ -43,7 +43,6 @@ Prereqs
 cd backend
 npm install
 # Configure env
-# Copy .env.example to .env and set MONGODB_URI + JWT_SECRET
 npm run dev   # starts http://localhost:3001
 ```
 
