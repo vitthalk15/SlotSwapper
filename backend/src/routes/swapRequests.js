@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import SwapRequest from '../models/SwapRequest.js';
 import Event from '../models/Event.js';
 import { authenticateToken } from '../middleware/auth.js';
@@ -104,8 +105,14 @@ router.post('/', async (req, res) => {
 // Respond to a swap request (accept/reject) - Supports both endpoint naming conventions
 router.put('/:id/respond', async (req, res) => {
   try {
+    const { id } = req.params;
     const { accept } = req.body;
-    const swapRequest = await SwapRequest.findById(req.params.id)
+
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ error: 'Invalid request id' });
+    }
+
+    const swapRequest = await SwapRequest.findById(id)
       .populate('requester_event_id')
       .populate('recipient_event_id');
 
@@ -122,6 +129,11 @@ router.put('/:id/respond', async (req, res) => {
       return res.status(400).json({ error: 'Swap request is no longer pending' });
     }
 
+    // Ensure both events still exist
+    if (!swapRequest.requester_event_id || !swapRequest.recipient_event_id) {
+      return res.status(404).json({ error: 'One or both events no longer exist' });
+    }
+
     const newStatus = accept ? 'ACCEPTED' : 'REJECTED';
     swapRequest.status = newStatus;
     await swapRequest.save();
@@ -130,6 +142,10 @@ router.put('/:id/respond', async (req, res) => {
       // Swap the events
       const requesterEvent = swapRequest.requester_event_id;
       const recipientEvent = swapRequest.recipient_event_id;
+
+      if (!requesterEvent || !recipientEvent) {
+        return res.status(404).json({ error: 'Events not found for swapping' });
+      }
 
       // Swap user_ids
       const tempUserId = requesterEvent.user_id;
@@ -168,8 +184,14 @@ router.put('/:id/respond', async (req, res) => {
 // Also support POST /api/swap-response/:requestId endpoint as specified in requirements
 export const swapResponseHandler = async (req, res) => {
   try {
+    const { requestId } = req.params;
     const { accept } = req.body;
-    const swapRequest = await SwapRequest.findById(req.params.requestId)
+
+    if (!mongoose.isValidObjectId(requestId)) {
+      return res.status(400).json({ error: 'Invalid request id' });
+    }
+
+    const swapRequest = await SwapRequest.findById(requestId)
       .populate('requester_event_id')
       .populate('recipient_event_id');
 
@@ -186,21 +208,26 @@ export const swapResponseHandler = async (req, res) => {
       return res.status(400).json({ error: 'Swap request is no longer pending' });
     }
 
+    if (!swapRequest.requester_event_id || !swapRequest.recipient_event_id) {
+      return res.status(404).json({ error: 'One or both events no longer exist' });
+    }
+
     const newStatus = accept ? 'ACCEPTED' : 'REJECTED';
     swapRequest.status = newStatus;
     await swapRequest.save();
 
     if (accept) {
-      // Swap the events
       const requesterEvent = swapRequest.requester_event_id;
       const recipientEvent = swapRequest.recipient_event_id;
 
-      // Swap user_ids
+      if (!requesterEvent || !recipientEvent) {
+        return res.status(404).json({ error: 'Events not found for swapping' });
+        }
+
       const tempUserId = requesterEvent.user_id;
       requesterEvent.user_id = recipientEvent.user_id;
       recipientEvent.user_id = tempUserId;
 
-      // Set both to BUSY
       requesterEvent.status = 'BUSY';
       recipientEvent.status = 'BUSY';
 
@@ -209,7 +236,6 @@ export const swapResponseHandler = async (req, res) => {
         recipientEvent.save(),
       ]);
     } else {
-      // Set both events back to SWAPPABLE
       await Promise.all([
         Event.findByIdAndUpdate(swapRequest.requester_event_id, { status: 'SWAPPABLE' }),
         Event.findByIdAndUpdate(swapRequest.recipient_event_id, { status: 'SWAPPABLE' }),
